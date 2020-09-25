@@ -1,12 +1,6 @@
 import pandas as pd
 import numpy as np
 
-from sklearn import preprocessing
-from scipy import stats
-
-import numpy as np
-import pandas as pd
-
 class MissingDataObserver:
     def __init__(self, train_df, valid_df, target):
         """
