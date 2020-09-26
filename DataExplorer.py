@@ -1,142 +1,120 @@
 import pandas as pd
 import numpy as np
 
-class MissingDataObserver:
-    def __init__(self, train_df, valid_df, target):
+class DataExplorer:
+    def __init__(self, data, cat_features, cont_features):
         """
-        Used to find missing values in both training and validation set
+          Used to for exploring data and suggestions to transform the data
                 
-        Inputs
-            - train_df = pandas dataframe
-            - valid_df = pandas dataframe
-            - target = target column
+          Attributes:
+          - data = pandas dataframe
+          - cat_features = list of categorical features in data
+          - cont_features = list of continuous features in data
         """
-        self.train_df = train_df
-        self.valid_df = valid_df
-        self.target = target
+        self.data = data
+        self.features = data.columns
+        self.cat_features = cat_features
+        self.cont_features = cont_features
 
-    def drop_target_column(self):
+  ### 1. START INSPECTOR MISSING - FIND MISSING VALUES ###
+    def missing_values_perc(self, features_to_check = None):
       """ 
-        Used in missing_values_perc() and get_excessive_missing_features()
+        Return one table (sorted descending, 0% excluded)
+        1. features_to_check = features with missing values and how much (as %) is missing
+
+        Params:
+        - features_to_check (list) = defaults to all features, if not then list of column names to check   
       """
-      # Create a copy of training dataframe
-      train_copy = self.train_df.copy()
+      # Default to check all features
+      if features_to_check == None:
+        features_to_check = self.features
+        features_to_drop = []
 
-      train_no_target = train_copy.drop(self.target, axis = 1)
-      # Drop target column and return dataframe
-      return train_no_target
+      # If not default then use features from the input
+      else:
+        features_to_drop = list(set(self.features) - set(list(features_to_check)))
 
+      temp = self.data.drop(features_to_drop, axis = 1)
 
-    def missing_values_perc(self):
-      """ 
-        Return two tables (sorted descending, 0% excluded)
-            1. train_df's features with missing values and how much (as %) is missing
-            2. valid_df's features with missing values and how much (as %) is missing
-      """
-      # Drop target column from training dataset
-      temp = self.drop_target_column()
-
-      # Create a table sorting highest to lowerest missing value percentages in train_df
-      train_missing_perc = pd.concat([(temp.isnull().sum() /  temp.isnull().count())*100], 
+      # Create a table sorting highest to lowest missing value percentages in data
+      data_missing_percs = pd.concat([(temp.isnull().sum() /  temp.isnull().count())*100], 
                                     axis = 1, 
                                     keys = ['percentage_missing']) \
                                     .sort_values('percentage_missing', ascending = False)
 
-      # Create a table sorting highest to lowerest missing value percentages in valid_df
-      valid_missing_perc = pd.concat([(self.valid_df.isnull().sum() /  self.valid_df.isnull().count())*100], 
-                                      axis = 1, 
-                                      keys = ['percentage_missing']) \
-                                      .sort_values('percentage_missing', ascending = False)
-
-      # Return these percentages greater than 0 (columns with missing values)
-      return(train_missing_perc[train_missing_perc['percentage_missing'] > 0],
-            valid_missing_perc[valid_missing_perc['percentage_missing'] > 0])
+      # Return these percentages greater than 0 (features with missing values)
+      return(data_missing_percs[data_missing_percs['percentage_missing'] > 0])
       
 
-    def get_features_with_missing_value(self):
+    def get_excessive_missing_features(self, threshold = None):
       """ 
-        Return two lists
-          1. List of train_df features with missing values
-          2. List of valid_df features with missing values
-      """
-      train_missing, valid_missing = self.missing_values_perc()
-
-      # Return two lists
-      # 1. train_df's columns with missing values
-      # 2. valid_df's columns with missing values
-      return(list(train_missing.index), 
-             list(valid_missing.index))
-
-
-    def get_excessive_missing_features(self, threshold):
-      """ 
-      Get list of features with {threshold}%+ missing values in "full" dataset (train_df + valid_df)
+        Get list of features with {threshold}%+ missing values, defaults to no threshold
       
-        Parameters used
-          - threshold = value between 0-100, filters to features with missing percentage above threshold
+        Params:
+        - threshold (default = 0+) = value between 0-100, filters to features with missing percentage above threshold
       """
+      # Default to lowest threshold (greater than 0 missing)
+      if threshold == None:
+        threshold = 0
 
-      # Drop target column from training dataset
-      temp = self.drop_target_column()
+      # If not default then use threshold
+      else:
+        pass
 
-      # Union training and valid dataset
-      full = pd.concat([temp, self.valid_df])
-
-      # Get % missing values in each column in "full" dataset
-      column_missing_percentages = pd.concat([(full.isnull().sum() /  full.isnull().count())*100], 
+      # Get % missing values in each feature in "full" dataset
+      feature_missing_percentages = pd.concat([(self.data.isnull().sum() /  self.data.isnull().count())*100], 
                                               axis = 1, keys=['percentage_missing'])
 
       # Return list of variables with {threshold}%+ missing values (threshold not included)
-      return list(column_missing_percentages[column_missing_percentages['percentage_missing'] > threshold].index)
+      return list(feature_missing_percentages[feature_missing_percentages['percentage_missing'] > threshold].index)
 
 
-    def drop_excessive_missing_features (self, threshold):
+    def drop_excessive_missing_features (self, threshold = None):
       """ 
-        Drop columns with {threshold}%+ missing values in "full" dataset (training + valid)
+        Drop features with {threshold}%+ missing values in data
       
-        Parameters used
-            - threshold = value between 0-100, filters to features with missing percentage above threshold
+        Params:
+        - threshold = value between 0-100, filters to features with missing percentage above threshold
       """
       
-      # Get list of features that have THRESHOLD missing values in full dataset
+      # Get list of features that have threshold%+ missing values in data
       features_to_drop = self.get_excessive_missing_features(threshold)
 
-      # Loop through training and valid dataset, dropping features with THRESHOLD missing values
+      # Loop through data's features dropping features with threshold%+ missing values
       for feature in features_to_drop:
-        self.train_df.drop(feature, axis = 1, inplace = True)
-        self.valid_df.drop(feature, axis = 1, inplace = True)
+        self.data.drop(feature, axis = 1, inplace = True)
 
       # Output which features were dropped
       print(f"Function has removed the following", features_to_drop)
           
-    def fill_missing_cat_features (self, cat_features):
+    def fill_missing_cat_features (self):
       """ 
-        Fill categorical variables in training and valid dataset with "NONE" then convert to string
-
-        Parameters used
-            - cat_features = list of categorical features to fill missing
+        Fill categorical features in the data with "NONE" then convert to string
       """
 
-      # Loops through each categorical feature column in train_df/valid_df and fills NAs with "NONE" then converts to string
-      for feature in cat_features:
-         self.train_df.loc[:, feature] = self.train_df[feature].fillna("NONE").astype(str)
-         self.valid_df.loc[:, feature] = self.valid_df[feature].fillna("NONE").astype(str)
+      # Loops through each categorical feature in data and fills NAs with "NONE" then converts to string
+      for feature in self.cat_features:
+         self.data.loc[:, feature] = self.data[feature].fillna("NONE").astype(str)
 
-class Binner:
-    def __init__(self, data, cont_features = None):
-        """
-        Used to find optimal bin widths
+      print("nans replaced with 'NONE'")
 
-        Inputs
-            - data = pandas dataframe
-            - cont_features = list of continuous features in the dataframe
-        """
-        self.cont_data = data[cont_features]
-        self.cont_features = cont_features
+    def fill_missing_cont_features (self, fill_missing):
+      """
+        Fill continuous features in the data with a user defined value
+      """
 
+      # Loops through each continuous feature column in the data and fills NAs with fill_missing
+      for feature in self.cont_features:
+        self.data.loc[:, feature] = self.data[feature].fillna(fill_missing)
+
+      print("nans replaced with", fill_missing)
+
+  ### END INSPECTOR MISSING - FIND MISSING VALUES ###
+
+  ### 2. START BINNER - find potentially optimum bins ###   
     def freedman_diaconis(self):
         """
-        Print each continuous column's bin width based upon freedman diaconis formula
+          Print each continuous column's bin width based upon freedman diaconis formula
         """
         print("=== CONTINUOUS FEATURES FREEDMAN BINNING WIDTHS ===")
 
@@ -146,39 +124,30 @@ class Binner:
         # - Find the IQR
         # - Get the size of the data
         for cont_feature in self.cont_features:
-            Q1 = self.cont_data[cont_feature].quantile(0.25)
-            Q3 = self.cont_data[cont_feature].quantile(0.75)
+            Q1 = self.data[cont_feature].quantile(0.25)
+            Q3 = self.data[cont_feature].quantile(0.75)
             IQR = Q3 - Q1
-            N   = self.cont_data.size
+            N   = self.data.size
             bin_width  = (2 * IQR) / np.power(N, 1/3)
 
             # Output feature and the bin_width
             print(cont_feature, ":", bin_width)
         
-        print("\n")    
+        print("\n")
 
+    ### END BINNER ###        
 
-class TreasureHunter:
-    def __init__(self, data, cat_features = None):
-        """
-        Used to find rare levels within features
-
-        Inputs
-            - data = pandas dataframe
-            - cat_features = list of categorical features in the dataframe
-        """
-        self.cat_data = data[cat_features]
-        self.cat_features = cat_features
-
+    ### 3. START TREASURE HUNTER - FINDING POTENTIALLY RARE VALUES ###
     def get_rare_values(self, features_to_rarify, threshold = 1, mandatory_levels = 1):
         """
-        Pull features and their levels that need to be rarified + highlight any features that don't meet mandatory_levels
+        Pull features and their levels that need to be rarified (based upong threshold) + highlight any features that don't meet mandatory_levels
         
-        Inputs
-            - threshold = return the level if makes up %threshold or less in the features
-            - features_to_rarify = categorical features to check
-            - mandatory_levels = int where only features with at least mandatory levels number of levels will be returned (would you rare feature with 2 levels?)
+        Params:
+        - threshold = return the level if level makes up %threshold or less in the features
+        - features_to_rarify = categorical features to check
+        - mandatory_levels = int where only features with at least mandatory levels number of levels will be returned (would you rare feature with 2 levels?)
         """
+
         # Initialise list for storing features with not enough levels
         not_enough_levels = []
 
@@ -188,7 +157,7 @@ class TreasureHunter:
         for feature in features_to_rarify:
 
             # Get number of levels for feature
-            num_of_levels = len(self.cat_data[feature].drop_duplicates())
+            num_of_levels = len(self.data[feature].drop_duplicates())
 
             # If there are more than or equal mandatory_levels, if so proceed
             if num_of_levels >= mandatory_levels:
@@ -202,7 +171,7 @@ class TreasureHunter:
                 # - Convert to string
                 # - Get percentages each level makes up of feature
                 # - Renaming columns
-                temp = self.cat_data[feature] \
+                temp = self.data[feature] \
                                         .fillna("NONE") \
                                         .astype(str) \
                                         .value_counts(normalize = True) \
@@ -218,3 +187,4 @@ class TreasureHunter:
 
         # Print list of features not having the mandatory_levels
         print("The following features didn't meet the mandatory levels:", not_enough_levels)
+    ### END TREASURE HUNTER ###
