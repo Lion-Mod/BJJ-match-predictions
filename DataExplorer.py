@@ -1,10 +1,11 @@
 import pandas as pd
 import numpy as np
+import dabl
 
 from sklearn import preprocessing
 
 class DataExplorer:
-    def __init__(self, data, cat_features, cont_features):
+    def __init__(self, data, cat_features, cont_features, train_or_valid):
         """
           Used to for exploring data and suggestions to transform the data
                 
@@ -12,11 +13,13 @@ class DataExplorer:
           - data = pandas dataframe
           - cat_features = list of categorical features in data
           - cont_features = list of continuous features in data
+          - train_or_valid = column of int values indicating True (0), Valid (1)
         """
         self.data = data
         self.features = data.columns
         self.cat_features = cat_features
         self.cont_features = cont_features
+        self.train_or_valid = train_or_valid
 
   ### 1. START INSPECTOR MISSING - FIND MISSING VALUES ###
     def missing_values_perc(self, features_to_check = None):
@@ -193,13 +196,22 @@ class DataExplorer:
 
     ### 4. FEATURE REMOVER - look for potential features to remove ###
 
-    def get_low_variance_cat_features (self, threshold = None):
+    def get_low_or_high_variance_cat_features (self, threshold = None, high_or_low = "low"):
       """ 
-      Get features with variance lower than threshold and state those with high enough variance (mainly used to detect features with lower number of levels)
+      Get features with variance higher/lower than threshold and state those with high/low enough variance.
+      
+      Used to identify features with potentially low/high number of features.
       
       Params:
       - threshold (default = 0+) = filters to features with variance of threshold or below
       """
+      # String to print at end, opposite of high_or_low
+      if high_or_low == "low":
+        output_string = "high"
+
+      else:
+        output_string = "low"
+
       # Default to lowest threshold (greater than 0 missing)
       if threshold == None:
         threshold = 9999999999
@@ -209,16 +221,16 @@ class DataExplorer:
         pass
 
       # Initialise
-      # 1. df for low variance features plus their variance
-      # 2. list for features that have a variance above the threshold
-      low_variance_features = pd.DataFrame(columns = ["feature", "variance"])
-      high_variance_features = []
+      # 1. df for low/high variance features plus their variance
+      # 2. list for features that have a variance above/below the threshold
+      keep_variance_features = pd.DataFrame(columns = ["feature", "variance"])
+      discard_variance_features = []
 
       # Create variance table of each categorical feature
       # - Get categorical features
       # - Label encode them if not done already
       # - Add low/high variance to the appropriate output
-      print("=== FEATURES WITH LOW VARIANCE ===")
+      print("=== FEATURES WITH", high_or_low.upper, "VARIANCE ===")
       for cat_feature in self.cat_features:
 
         temp = self.data[cat_feature].astype(str).values
@@ -229,14 +241,67 @@ class DataExplorer:
         label_encoded_feature = lbl_enc.transform(temp)
 
         variance = label_encoded_feature.var()
-      
-        # Print feature if variance equal or less than threshold
-        if threshold >= variance:
-          low_variance_features= low_variance_features.append({"feature": cat_feature, "variance": '{:f}'.format(variance)}, ignore_index = True)
-        
-        else:
-          high_variance_features.append(cat_feature)
 
-      print(low_variance_features.sort_values(by = ["variance"]))
-      print("\n=== FEATURES WITH HIGH VARIANCE ===")
-      print(high_variance_features, "\n")
+        # Below looks for features with low variance
+        if high_or_low == "low":
+          if threshold >= variance:
+            keep_variance_features = keep_variance_features.append({"feature": cat_feature, "variance": '{:f}'.format(variance)}, ignore_index = True)
+          
+          else:
+            discard_variance_features.append(cat_feature)
+
+        elif high_or_low == "high":
+          if threshold <= variance:
+            keep_variance_features = keep_variance_features.append({"feature": cat_feature, "variance": '{:f}'.format(variance)}, ignore_index = True)
+
+          else:
+            discard_variance_features.append(cat_feature)
+
+      print(keep_variance_features.sort_values(by = ["variance"]))
+      print("\n=== FEATURES WITH", output_string, "VARIANCE ===")
+      print(discard_variance_features, "\n")
+
+      ### END FEATURE REMOVER ###
+
+      ### 5. INSPECTOR UNKNOWN - find levels in training data but not categorical features ###
+
+    def get_features_with_unknowns (self):
+      """ 
+      Print a dataframe with features that have levels only in the valid dataset not the train dataset.
+      
+      Used to identify features with unknowns.
+      """      
+      # Intialise output dataframe
+      # - feature = the feature with unknowns
+      # - unknowns = list of the unknown values
+      # - num_of_unknowns = number of unknowns
+      features_and_unknowns = pd.DataFrame(columns = ["feature", "unknowns", "num_of_unknowns"])
+
+      # Loop through each categorical feature and check if it has levels that exist only in the valid set
+      # - Get unique levels of the feature in the training dataset
+      # - Get unique levels of the feature in the valid dataset
+      # - Compare the two level lists, return the valid levels that aren't in the training dataset
+      # - If there are unknowns, add the details to the output dataframe
+      for cat_feature in self.cat_features:
+        train_levels = self.data.loc[self.data[self.train_or_valid] == 0][cat_feature].unique()
+        valid_levels = self.data.loc[self.data[self.train_or_valid] == 1][cat_feature].unique()
+
+        unknown_levels = list(set(valid_levels) - set(train_levels))
+
+        if len(unknown_levels) > 0:
+          features_and_unknowns = features_and_unknowns.append({"feature" : cat_feature, 
+                                                                "unknowns" : unknown_levels,
+                                                                "num_of_unknowns" : len(unknown_levels)}, ignore_index = True)
+        else:
+          pass
+      
+      # Print the output dataframe
+      print(features_and_unknowns)
+
+
+    def mass_target_plots(self, target):
+      """
+      Plot multiple plots for categorical and continuous features
+      """
+
+      dabl.plot(self.data, target_col = target)
