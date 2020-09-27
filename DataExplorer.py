@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 
 class DataExplorer:
-    def __init__(self, data, cat_features, cont_features):
+    def __init__(self, data, cat_features = None, cont_features = None):
         """
           Used to for exploring data and suggestions to transform the data
                 
@@ -188,3 +188,33 @@ class DataExplorer:
         # Print list of features not having the mandatory_levels
         print("The following features didn't meet the mandatory levels:", not_enough_levels)
     ### END TREASURE HUNTER ###
+
+    ### 4. FEATURE REMOVER - look for potential features to remove ###
+
+    def get_low_variance_cat_features (self, threshold = None):
+      """ 
+      Get features with variance lower than threshold (mainly used to detect features with lower number of levels)
+      
+      Params:
+      - threshold (default = 0+) = value between 0-100, filters to features with variance of threshold or below
+      """
+      # Default to lowest threshold (greater than 0 missing)
+      if threshold == None:
+        threshold = 100
+
+      # If not default then use threshold
+      else:
+        pass
+
+      # Create variance table of each categorical feature
+      # - Get categorical features
+      # - Calculate variance
+      # - Rename columns
+      feature_variances = self.data[self.cat_features] \
+                                                .var() \
+                                                .rename_axis("feature") \
+                                                .reset_index(name = "variance")
+
+      # Filter data to variance equal or less than threshold
+      print(feature_variances[feature_variances["variance"] <= threshold])
+
