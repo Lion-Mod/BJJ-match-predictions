@@ -1,8 +1,10 @@
 import pandas as pd
 import numpy as np
 
+from sklearn import preprocessing
+
 class DataExplorer:
-    def __init__(self, data, cat_features = None, cont_features = None):
+    def __init__(self, data, cat_features, cont_features):
         """
           Used to for exploring data and suggestions to transform the data
                 
@@ -193,28 +195,48 @@ class DataExplorer:
 
     def get_low_variance_cat_features (self, threshold = None):
       """ 
-      Get features with variance lower than threshold (mainly used to detect features with lower number of levels)
+      Get features with variance lower than threshold and state those with high enough variance (mainly used to detect features with lower number of levels)
       
       Params:
-      - threshold (default = 0+) = value between 0-100, filters to features with variance of threshold or below
+      - threshold (default = 0+) = filters to features with variance of threshold or below
       """
       # Default to lowest threshold (greater than 0 missing)
       if threshold == None:
-        threshold = 100
+        threshold = 9999999999
 
       # If not default then use threshold
       else:
         pass
 
+      # Initialise
+      # 1. df for low variance features plus their variance
+      # 2. list for features that have a variance above the threshold
+      low_variance_features = pd.DataFrame(columns = ["feature", "variance"])
+      high_variance_features = []
+
       # Create variance table of each categorical feature
       # - Get categorical features
-      # - Calculate variance
-      # - Rename columns
-      feature_variances = self.data[self.cat_features] \
-                                                .var() \
-                                                .rename_axis("feature") \
-                                                .reset_index(name = "variance")
+      # - Label encode them if not done already
+      # - Add low/high variance to the appropriate output
+      print("=== FEATURES WITH LOW VARIANCE ===")
+      for cat_feature in self.cat_features:
 
-      # Filter data to variance equal or less than threshold
-      print(feature_variances[feature_variances["variance"] <= threshold])
+        temp = self.data[cat_feature].astype(str).values
 
+        lbl_enc = preprocessing.LabelEncoder()
+        lbl_enc.fit(temp)
+
+        label_encoded_feature = lbl_enc.transform(temp)
+
+        variance = label_encoded_feature.var()
+      
+        # Print feature if variance equal or less than threshold
+        if threshold >= variance:
+          low_variance_features= low_variance_features.append({"feature": cat_feature, "variance": '{:f}'.format(variance)}, ignore_index = True)
+        
+        else:
+          high_variance_features.append(cat_feature)
+
+      print(low_variance_features.sort_values(by = ["variance"]))
+      print("\n=== FEATURES WITH HIGH VARIANCE ===")
+      print(high_variance_features, "\n")
