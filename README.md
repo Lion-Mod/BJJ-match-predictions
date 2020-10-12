@@ -21,19 +21,19 @@ As mentioned in the notebook the majority of features were cumulatively summed a
 Most of the code was a function (in R) similar to this
 
 ```points_tracking <- function (matches) {
- matches %>%
-    arrange(fighter_a, id) %>%
-    group_by(fighter_a, year) %>%
-    mutate(win = if_else(w_l == "w" & method_cat == "points", 1, 0),
+ matches %>%                                                             # Feed matches in
+    arrange(fighter_a, id) %>%                                           # Arrange by fighter and earliest to latest fight
+    group_by(fighter_a, year) %>%                                        # Group by each fighter and year
+    mutate(win = if_else(w_l == "w" & method_cat == "points", 1, 0),     # Create cumulative wins and losses via points
            lose = if_else(w_l == "l" & method_cat == "points", 1, 0),
            points_win_TD = cumsum(win),
            points_lose_TD = cumsum(lose),
            cum_win_points = lag(points_win_TD, default = 0),
            cum_lose_points = lag(points_lose_TD, default = 0)) %>%
-    select(-win, -lose, -ends_with("TD")) %>%
-    ungroup()
-}```
-
+    select(-win, -lose, -ends_with("TD")) %>%                            # Remove unwanted columns
+    ungroup()                                                            # Ungroup
+}
+```
 ## AUC Score of ~0.87 on validation data. 
 
 
