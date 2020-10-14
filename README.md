@@ -2,6 +2,8 @@ This project has been done for educational purposes only and not for commercial 
 
 https://www.gov.uk/guidance/exceptions-to-copyright
 
+Data collated from https://www.bjjheroes.com/
+
 ## AUC Score of ~0.87 on validation data
 
 ## Why this was done (more detail in the notebook)
